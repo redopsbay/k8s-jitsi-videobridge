@@ -1,0 +1,179 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jitsi-videobridge-config
+  namespace: jitsi
+data:
+  config: |
+    # Jitsi Videobridge settings
+
+    # sets the XMPP domain (default: none)
+    JVB_HOSTNAME=meet.goadminops.com
+
+    # sets the hostname of the XMPP server (default: domain if set, localhost otherwise)
+    JVB_HOST=
+
+    # sets the port of the XMPP server (default: 5275)
+    JVB_PORT=5347
+
+    # sets the shared secret used to authenticate to the XMPP server
+    JVB_SECRET=jvb_secret
+
+    # extra options to pass to the JVB daemon
+    JVB_OPTS="--apis=,"
+
+
+    # adds java system props that are passed to jvb (default are for home and logging config file)
+    JAVA_SYS_PROPS="-Dconfig.file=/etc/jitsi/videobridge/jvb.conf -Dnet.java.sip.communicator.SC_HOME_DIR_LOCATION=/etc/jitsi -Dnet.java.sip.communicator.SC_HOME_DIR_NAME=videobridge -Dnet.java.sip.communicator.SC_LOG_DIR_LOCATION=/var/log/jitsi -Djava.util.logging.config.file=/etc/jitsi/videobridge/logging.properties"
+
+  jvb.conf: |
+    videobridge {
+        ice {
+            udp {
+                port = 5347
+            }
+            tcp {
+                enabled = false
+                port = 9090
+
+                mapped-port = 443
+
+        }
+    }
+    apis {
+      xmpp-client {
+        configs {
+          shard {
+              HOSTNAME = "meet.goadminops.com"
+              DOMAIN = "auth.meet.goadminops.com"
+              USERNAME = "jvb"
+              PASSWORD = "jvb-password"
+              MUC_JIDS = "jvbBrewery@internal.auth.meet.goadminops.com"
+              MUC_NICKNAME = "videobridge"
+              DISABLE_CERTIFICATE_VERIFICATION = true
+            }
+          }
+        }
+      }
+    stats {
+            enabled = true
+        }
+    websockets {
+            enabled = true
+            domain = "meet.goadminops.com"
+            tls = true
+            server-id = "JvbBrewery"
+        }
+    http-servers {
+        private {
+          host = 0.0.0.0
+        }
+        public {
+            host = 0.0.0.0
+            port = 9090
+        }
+      }
+    }
+    ice4j {
+      harvest {
+        mapping {
+          stun {
+          addresses = [ "meet-jit-si-turnrelay.jitsi.net:443" ]
+          }
+        }
+      }
+    }
+  
+  logging.properties: |
+    handlers= java.util.logging.ConsoleHandler
+    #handlers= java.util.logging.ConsoleHandler, com.agafua.syslog.SyslogHandler
+    #handlers= java.util.logging.ConsoleHandler, io.sentry.jul.SentryHandler
+
+    java.util.logging.ConsoleHandler.level = ALL
+    java.util.logging.ConsoleHandler.formatter = org.jitsi.utils.logging2.JitsiLogFormatter
+
+    net.java.sip.communicator.util.ScLogFormatter.programname=JVB
+
+    .level=INFO
+
+    org.jitsi.videobridge.xmpp.ComponentImpl.level=FINE
+
+    # All of the INFO level logs from MediaStreamImpl are unnecessary in the context of jitsi-videobridge.
+    org.jitsi.impl.neomedia.MediaStreamImpl.level=WARNING
+
+    # Syslog (uncomment handler to use)
+    com.agafua.syslog.SyslogHandler.transport = udp
+    com.agafua.syslog.SyslogHandler.facility = local0
+    com.agafua.syslog.SyslogHandler.port = 514
+    com.agafua.syslog.SyslogHandler.hostname = localhost
+    com.agafua.syslog.SyslogHandler.formatter = org.jitsi.utils.logging2.JitsiLogFormatter
+    com.agafua.syslog.SyslogHandler.escapeNewlines = false
+
+    # Sentry (uncomment handler to use)
+    io.sentry.jul.SentryHandler.level=WARNING
+
+    # to disable double timestamps in syslog uncomment next line
+    #net.java.sip.communicator.util.ScLogFormatter.disableTimestamp=true
+
+    # time series logging
+    java.util.logging.SimpleFormatter.format= %5$s%n
+    java.util.logging.FileHandler.level = ALL
+    java.util.logging.FileHandler.formatter = java.util.logging.SimpleFormatter
+    java.util.logging.FileHandler.pattern = /tmp/jvb-series.log
+    java.util.logging.FileHandler.limit = 200000000
+    java.util.logging.FileHandler.count = 1
+    java.util.logging.FileHandler.append = false
+
+    timeseries.level=OFF
+    timeseries.org.jitsi.videobridge.cc.allocation.BitrateAllocator.level=ALL
+    timeseries.useParentHandlers = false
+    # time series logging is disabled by default. Uncomment the line below to enable it.
+    #timeseries.handlers = java.util.logging.FileHandler
+  
+  sip-communicator.properties: |
+    org.ice4j.ice.harvest.NAT_HARVESTER_LOCAL_ADDRESS=192.46.226.21
+    org.ice4j.ice.harvest.NAT_HARVESTER_PUBLIC_ADDRESS=meet.goadminops.com
+
+  log4j2.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+      <Configuration>
+          <Properties>
+                      <Property name="log-path">/var/log/jitsi</Property>
+              </Properties>
+          <Appenders>
+              <RollingFile name="RollingFile" fileName="${log-path}/cs.log"
+                      filePattern="${log-path}/$${date:yyyy-MM}/cs-%d{MM-dd-yyyy}-%i.log.gz">
+                              <PatternLayout pattern="%d %-5p (%F:%L) - %m%n"/>
+                      <Policies>
+                              <TimeBasedTriggeringPolicy />
+                              <SizeBasedTriggeringPolicy size="250 MB"/>
+                      </Policies>
+              </RollingFile>
+              <!--
+              <Console name="STDOUT" target="SYSTEM_OUT">
+                      <PatternLayout pattern="%d %-5p (%F:%L) - %m%n"/>
+              </Console>
+              -->
+          </Appenders>
+          <Loggers>
+              <!--<Logger name="org.apache.log4j.xml" level="debug"/>-->
+              <Logger name="org.apache.log4j.xml" level="info"/>
+              <Root level="info">
+                  <AppenderRef ref="RollingFile"/>
+                <!--  <AppenderRef ref="STDOUT"/>  -->
+              </Root>
+          </Loggers>
+      </Configuration>
+
+      <!--
+      -Dlog4j.configurationFile=config/log4j2.xml has to be used in VM args
+      -->
+
+  callstats-java-sdk.properties: |
+    CallStats.BaseURL = https://collector.callstats.io:443
+    CallStats.AuthTimeOut = 5000
+    CallStats.ConnectionTimeOut = 30000
+    CallStats.SOTimeOut = 30000
+    CallStats.keepAliveInterval = 1000
+    

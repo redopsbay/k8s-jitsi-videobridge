@@ -1,0 +1,97 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jitsi
+  labels:
+    app: jitsi-videobridge2
+  namespace: jitsi
+spec:
+  revisionHistoryLimit: 100
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  replicas: 50
+  selector:
+    matchLabels:
+      app: jitsi-videobridge2
+  template:
+    metadata:
+      labels:
+        app: jitsi-videobridge2
+    spec:
+      containers:
+      - name: jitsi-videobridge2
+        image: jitsi/jvb:latest
+        env:
+        - name: DOCKER_HOST_ADDRESS
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: XMPP_AUTH_DOMAIN
+          value: "auth.meet.goadminops.com"
+        - name: XMPP_INTERNAL_MUC_DOMAIN
+          value: "internal.auth.meet.goadminops.com"
+        - name: XMPP_SERVER
+          value: "meet.goadminops.com"
+        - name: JVB_AUTH_USER
+          value: "jvb"
+        - name: JVB_AUTH_PASSWORD
+          value: "jvb-auth-password"
+        - name: JVB_BREWERY_MUC
+          value: "jvbBrewery"
+        - name: JVB_PORT
+          value: "30300"
+        - name: JVB_TCP_HARVESTER_DISABLED
+          value: "true"
+        - name: JVB_TCP_PORT
+          value: "9090"
+        - name: JVB_TCP_MAPPED_PORT
+          value: "443"
+        - name: JVB_STUN_SERVERS
+          value: "meet-jit-si-turnrelay.jitsi.net:443"
+        - name: JVB_ENABLE_APIS
+          value: "--apis="
+        - name: JVB_WS_DOMAIN
+          value: "meet.goadminops.com"
+        - name: JVB_WS_SERVER_ID
+          value: "JvbBrewery"
+        - name: PUBLIC_URL
+          value: "https://meet.goadminops.com"
+        - name: TZ
+          value: "Asia/Manila"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "250m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 9090
+          name: tcpharvest
+        - containerPort: 443
+          name: https
+        - containerPort: 10000
+          name: udp
+        - containerPort: 5347
+          name: jvbport
+        - containerPort: 30300
+          name: iceudp
+        readinessProbe:
+          tcpSocket:
+            port: 9090
+          initialDelaySeconds: 30
+          periodSeconds: 60
+        volumeMounts:
+        - name: videobridge-nfs
+          mountPath: /config
+        imagePullPolicy: Always
+      imagePullSecrets:
+        - name: docker-credentials
+      volumes:
+        - name: videobridge-nfs
+          persistentVolumeClaim:
+            claimName: nfs-server-pvc
